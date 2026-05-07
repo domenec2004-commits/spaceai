@@ -15,37 +15,23 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "API key no configurada" });
   }
 
-  const prompt = `Eres un experto interiorista. Analiza esta imagen de un espacio doméstico y proporciona un análisis completo para rediseñarlo con estilo "${style}".
-
-Responde ÚNICAMENTE con un JSON válido, sin texto adicional ni backticks, con esta estructura exacta:
-{
-  "resumen": "descripción de 2-3 frases del espacio actual",
-  "etiquetas_positivas": ["punto fuerte 1", "punto fuerte 2"],
-  "etiquetas_mejora": ["mejora 1", "mejora 2"],
-  "puntuaciones": [
-    {"nombre": "Iluminación", "valor": 70},
-    {"nombre": "Distribución", "valor": 60},
-    {"nombre": "Estilo", "valor": 50},
-    {"nombre": "Confort", "valor": 65}
-  ],
-  "sugerencias": [
-    {"icono": "💡", "titulo": "Título corto", "descripcion": "Descripción práctica en 1-2 frases"},
-    {"icono": "🛋️", "titulo": "Título corto", "descripcion": "Descripción práctica"},
-    {"icono": "🌿", "titulo": "Título corto", "descripcion": "Descripción práctica"},
-    {"icono": "🎨", "titulo": "Título corto", "descripcion": "Descripción práctica"}
-  ],
-  "paleta": [
-    {"color": "#hex", "nombre": "Nombre del tono"},
-    {"color": "#hex", "nombre": "Nombre del tono"},
-    {"color": "#hex", "nombre": "Nombre del tono"},
-    {"color": "#hex", "nombre": "Nombre del tono"},
-    {"color": "#hex", "nombre": "Nombre del tono"}
-  ]
-}`;
+  const prompt = `Eres un experto interiorista. Analiza esta imagen de un espacio y redisénalo con estilo "${style}". Responde SOLO con JSON válido sin backticks: {"resumen":"texto","etiquetas_positivas":["a","b"],"etiquetas_mejora":["a","b"],"puntuaciones":[{"nombre":"Iluminación","valor":70},{"nombre":"Distribución","valor":60},{"nombre":"Estilo","valor":50},{"nombre":"Confort","valor":65}],"sugerencias":[{"icono":"💡","titulo":"titulo","descripcion":"desc"},{"icono":"🛋️","titulo":"titulo","descripcion":"desc"},{"icono":"🌿","titulo":"titulo","descripcion":"desc"},{"icono":"🎨","titulo":"titulo","descripcion":"desc"}],"paleta":[{"color":"#hex","nombre":"nombre"},{"color":"#hex","nombre":"nombre"},{"color":"#hex","nombre":"nombre"},{"color":"#hex","nombre":"nombre"},{"color":"#hex","nombre":"nombre"}]}`;
 
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const result = await model.generateContent([
-      prompt
+      prompt,
+      { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
+    ]);
+
+    const text = result.response.text();
+    const clean = text.replace(/```json|```/g, "").trim();
+    const json = JSON.parse(clean);
+    res.status(200).json(json);
+  } catch (err) {
+    console.error("Gemini error:", err?.message || err);
+    res.status(500).json({ error: err?.message || "Error al analizar" });
+  }
+}
