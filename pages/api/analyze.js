@@ -1,10 +1,8 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const config = {
   api: { bodyParser: { sizeLimit: "10mb" } },
 };
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
@@ -12,6 +10,10 @@ export default async function handler(req, res) {
   const { imageBase64, style } = req.body;
   if (!imageBase64 || !style)
     return res.status(400).json({ error: "Faltan datos" });
+
+  if (!process.env.GEMINI_API_KEY) {
+    return res.status(500).json({ error: "API key no configurada" });
+  }
 
   const prompt = `Eres un experto interiorista. Analiza esta imagen de un espacio doméstico y proporciona un análisis completo para rediseñarlo con estilo "${style}".
 
@@ -42,33 +44,8 @@ Responde ÚNICAMENTE con un JSON válido, sin texto adicional ni backticks, con 
 }`;
 
   try {
-    const response = await client.messages.create({
-      model: "claude-opus-4-5",
-      max_tokens: 1024,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: "image/jpeg",
-                data: imageBase64,
-              },
-            },
-            { type: "text", text: prompt },
-          ],
-        },
-      ],
-    });
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const text = response.content.map((b) => b.text || "").join("");
-    const clean = text.replace(/```json|```/g, "").trim();
-    const result = JSON.parse(clean);
-    res.status(200).json(result);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error al analizar la imagen" });
-  }
-}
+    const result = await model.generateContent([
+      prompt
